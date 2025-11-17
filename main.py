@@ -1,8 +1,13 @@
 import os
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
+from typing import Optional
 
-app = FastAPI()
+from schemas import Lead as LeadSchema
+from database import create_document
+
+app = FastAPI(title="Divorce Service API")
 
 app.add_middleware(
     CORSMiddleware,
@@ -63,6 +68,27 @@ def test_database():
     response["database_name"] = "✅ Set" if os.getenv("DATABASE_NAME") else "❌ Not Set"
     
     return response
+
+# ============ Divorce Service Endpoints ============
+
+class LeadCreate(BaseModel):
+    full_name: str
+    email: str
+    phone: Optional[str] = None
+    city: Optional[str] = None
+    case_type: Optional[str] = "amicable"
+    message: Optional[str] = None
+    preferred_time: Optional[str] = None
+    source: Optional[str] = "website"
+
+@app.post("/api/leads")
+def create_lead(payload: LeadCreate):
+    try:
+        lead = LeadSchema(**payload.model_dump())
+        inserted_id = create_document("lead", lead)
+        return {"status": "ok", "id": inserted_id}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 if __name__ == "__main__":
